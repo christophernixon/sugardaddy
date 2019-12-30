@@ -3,6 +3,8 @@
 import argparse
 import os
 import re
+import math
+import json
 from datetime import *
 
 import matplotlib.pyplot as plt
@@ -251,6 +253,90 @@ def message_count(dataframe, time_frame = '1D', trendline = False, write_path = 
         fig.savefig('images/mgs_day/messages_per_day{}.png'.format(i), format = "PNG", dpi = 100)
     plt.show()
     
+def get_general_stats(df, print_stats = False):
+    """ Gets and prints general statistics from the df:
+    - Total messages sent per user
+    - Total words sent per user
+    - Most active day(most messages sent) per user
+    - Most active week(most messages sent) per user
+    - Average messages per day per user
+    - Average messages per week per user
+    - Average message length(chars) per user
+    - Average message length(words) per user
+    Returned in a dict.
+
+    Parameters:
+    ----------
+    df:  Required. Dataframe containing chat information. 
+    print_stats: Bool, whether or not to print the statistics.
+    """
+    stat_dict = {}
+    for sender in df.sender.unique():
+        stat_dict[sender] = {}
+
+    # Total messages sent
+    for sender in df.sender.unique():
+        stat_dict[sender]['Total_sent'] = len(df.loc[df.sender == sender])
+    
+    # Total words sent
+    for sender, group in df.groupby('sender'):
+        message_lengths = group['raw_text'].map(lambda x: len(re.findall(r'\w+', x)) )
+        stat_dict[sender]['Total_words_sent'] = math.ceil(message_lengths.sum())
+
+    # Most active day
+    for sender, group in df.groupby('sender'):
+            # Set index to timestamp, resample per day, get message count per day
+            group = group.set_index('timestamp')
+            group = group.resample('1D').count().reset_index()
+            # Select row of maximum value of raw_text(now the count of messages per day)
+            max_row = group.loc[group.raw_text.idxmax()]
+            # Select date from row
+            max_timestamp = max_row.timestamp.date()
+            stat_dict[sender]['Most_active_day'] = max_timestamp
+
+    # Most active week
+    for sender, group in df.groupby('sender'):
+        group = group.set_index('timestamp')
+        group = group.resample('7D').count().reset_index()
+        max_row = group.loc[group.raw_text.idxmax()]
+        max_timestamp = max_row.timestamp.date()
+        stat_dict[sender]['Most_active_week'] = max_timestamp
+
+    # Average messages per day
+    for sender, group in df.groupby('sender'):
+        group = group.set_index('timestamp')
+        group = group.resample('1D').count().reset_index()
+        average_sent = group.raw_text.mean()
+        stat_dict[sender]['Mean_daily_sent'] = math.ceil(average_sent)
+    
+    # Average messages per week
+    for sender, group in df.groupby('sender'):
+        group = group.set_index('timestamp')
+        group = group.resample('7D').count().reset_index()
+        average_sent = group.raw_text.mean()
+        stat_dict[sender]['Mean_weekly_sent'] = math.ceil(average_sent)
+
+    # Average message length(chars)
+    for sender, group in df.groupby('sender'):
+        message_lengths = group['raw_text'].map(lambda x: len(x))
+        stat_dict[sender]['Mean_msg_len_char'] = math.ceil(message_lengths.mean())
+
+    # Average message length(words)
+    for sender, group in df.groupby('sender'):
+        message_lengths = group['raw_text'].map(lambda x: len(re.findall(r'\w+', x)) )
+        stat_dict[sender]['Mean_msg_len_word'] = math.ceil(message_lengths.mean())
+
+    if print_stats:
+        for sender in stat_dict:
+            stat_dict[sender]['Most_active_day'] = stat_dict[sender]['Most_active_day'].strftime('%a %d, %b %Y')
+            start_date = stat_dict[sender]['Most_active_week']
+            end_date = start_date + timedelta(days = 7)
+            start_date = start_date.strftime('%a %d, %b %Y')
+            end_date = end_date.strftime('%a %d, %b %Y')
+            stat_dict[sender]['Most_active_week'] = start_date + " until " + end_date
+        print(json.dumps(stat_dict, indent = 2))
+    
+    return stat_dict
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -267,3 +353,4 @@ if __name__ == "__main__":
     df = parse_texts(args.filepath)
     generate_wordcloud(df,sender = args.sender, mask_path = args.mask, write_path = args.dest)
     message_count(df, '1D', trendline = False)
+    get_general_stats(df, print_stats = True)

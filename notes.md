@@ -15,7 +15,13 @@
 - [ ] __Graph: Reply length over time:__ 
     A line graph, with a line for each member of the conversation (minimum 2), y-axis reply length, x-axis time since conversation start. [Example.](https://python-graph-gallery.com/124-spaghetti-plot/)
 - [ ] __Graph: Sentiment against time:__
-    Bubble-plot, sentiment on one axis ranging from positive to negative, time on other ranging from start to end of a week, size of bubbles represents message length. 
+    Bubble-plot, sentiment on one axis ranging from positive to negative, time on other ranging from start to end of a week, size of bubbles represents message length.
+- [ ] __Graph: Most active weekday:__
+    Bubble-plot with a bubble for each weekday, size corresponds to number of messages sent on that day.
+- [x] __Graph: Message against time:__
+    Line graph, aggregated message count on y, time on x axis. Allow for differing time bands
+- [x] __Stats:__
+    Print simple statistics such as total number of messages per user, most active day, average messages per day, average message length(words and characters), number of times love is expressed
 
 ### Information to display
 - Word frequency over entire set: Wordcloud
@@ -23,4 +29,8 @@
 - Text frequency against time
 - Aggregated text frequency: which day did we send most texts? (Circle plot)
 - Sentiment per person: See [IBM's service](https://cloud.ibm.com/apidocs/natural-language-understanding/natural-language-understanding#sentiment), [Google's serivce](https://cloud.google.com/natural-language/docs/analyzing-sentiment#language-sentiment-string-python). ![](./misc/sentiment_services.jpg)
+
+### Useful
+![](misc/strftime.png)
+
 
