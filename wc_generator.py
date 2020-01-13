@@ -13,6 +13,8 @@ import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from pandas.plotting import register_matplotlib_converters
 from dateutil.parser import parse
 from emoji import UNICODE_EMOJI
@@ -171,7 +173,7 @@ def generate_wordcloud(dataframe, sender=None, mask_path=None, write_path=None):
 
     plt.show()
 
-def message_count(dataframe, time_frame = '1D', trendline = False, write_path = None):
+def plot_message_count(dataframe, time_frame = '1D', trendline = False, write_path = None):
     """ Plot message count for each user for various timeframes.
     dataframe: Required. Dataframe containing chat information.
     time_frame: Can be used to get weekly message count: '7D', or monthly count '1M'.
@@ -338,6 +340,81 @@ def get_general_stats(df, print_stats = False):
     
     return stat_dict
 
+def plot_msg_len_distrib(df):
+    pass
+
+def plot_active_hour(df):
+    pass
+
+def analyse_sentiment(df):
+    nltk.download('vader_lexicon')
+    sentiment_analyzer = SentimentIntensityAnalyzer()
+    neutral, negative, positive = 0, 0, 0
+
+    num_charts = len(df.sender.unique())
+    fig, axs = plt.subplots(1, num_charts)
+    fig.set_size_inches(11, 5)
+    chart_index = 0
+
+    for sender, group in df.groupby('sender'):
+        all_text = group.raw_text
+        for index, sentence in enumerate(all_text):
+            if index % 10 == 0:
+                print("Processing {0}%".format(int((index * 100) / len(all_text))))
+
+            if re.match(r'^[\w]', sentence) is None:
+                continue
+
+            scores = sentiment_analyzer.polarity_scores(sentence)
+            scores.pop('compound', None)
+
+            maxAttribute = max(scores, key=lambda k: scores[k])
+
+            if maxAttribute == "neu":
+                neutral += 1
+            elif maxAttribute == "neg":
+                negative += 1
+            else:
+                positive += 1
+
+        total = neutral + negative + positive
+        print("Negative: {0}% | Neutral: {1}% | Positive: {2}%".format(
+            int(negative*100/total), int(neutral*100/total), int(positive*100/total)))
+
+        labels = ['Neutral', 'Negative', 'Positive']
+        sizes = [neutral, negative, positive]
+        colors = ['#00bcd7', '#F57C00', '#CDDC39']
+        explode = (0.3, 0.3, 0.3)
+
+        # Plot
+        if chart_index % 2 == 0:
+            wedges, texts = axs[chart_index].pie(sizes, wedgeprops=dict(width=0.5),  
+                                 shadow = True, colors=colors, counterclock = False, startangle=120)
+        else:
+            wedges, texts = axs[chart_index].pie(sizes, wedgeprops=dict(width=0.5),
+                                 shadow = True, colors=colors, counterclock = True, startangle=60)
+        bbox_props = dict(boxstyle="square,pad=0.3", fc="w", ec="k", lw=0.72)
+        kw = dict(arrowprops=dict(arrowstyle="-"),
+                  bbox=bbox_props, zorder=0, va="center")
+
+        for i, p in enumerate(wedges):
+            ang = (p.theta2 - p.theta1)/2. + p.theta1
+            y = np.sin(np.deg2rad(ang))
+            x = np.cos(np.deg2rad(ang))
+            horizontalalignment = {-1: "right", 1: "left"}[int(np.sign(x))]
+            connectionstyle = "angle,angleA=0,angleB={}".format(ang)
+            kw["arrowprops"].update({"connectionstyle": connectionstyle})
+            axs[chart_index].annotate(labels[i], xy=(x, y), xytext=(1.35*np.sign(x), 1.4*y),
+                        horizontalalignment=horizontalalignment, **kw)
+
+        axs[chart_index].set_axis_off()
+        axs[chart_index].set_title(sender)
+        chart_index += 1
+
+    fig.suptitle('Do you text happy?')
+    fig.tight_layout()
+    plt.show()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("filepath", help="Filepath to whatsapp text file to be processed.",
@@ -352,5 +429,6 @@ if __name__ == "__main__":
 
     df = parse_texts(args.filepath)
     generate_wordcloud(df,sender = args.sender, mask_path = args.mask, write_path = args.dest)
-    message_count(df, '1D', trendline = False)
+    plot_message_count(df, '1D', trendline = True)
     get_general_stats(df, print_stats = True)
+    analyse_sentiment(df)
