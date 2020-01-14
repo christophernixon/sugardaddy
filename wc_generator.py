@@ -1,24 +1,24 @@
+"""Imports, analyses and charts whatsapp chat data."""
 #!/usr/bin/env python
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 import argparse
+import json
+import math
 import os
 import re
-import math
-import json
 from datetime import *
-import time
 
-import matplotlib.pyplot as plt
-from matplotlib.lines       import Line2D
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import nltk
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import nltk
+from dateutil.parser import parse
+from emoji.unicode_codes import UNICODE_EMOJI
+from matplotlib.lines import Line2D
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from pandas.plotting import register_matplotlib_converters
-from dateutil.parser import parse
-from emoji import UNICODE_EMOJI
 from PIL import Image
 
 from wordcloud import STOPWORDS, ImageColorGenerator, WordCloud
@@ -29,10 +29,13 @@ Whatsapp line format:
 "[dd/mm/yyyy, hh/mm/ss] SENDER: MESSAGE\n"
 """
 
-def parse_texts(raw_text_file):
-    """Given a filepath to a .txt file with Whatsapp formatted lines,
-    this returns a dataframe representing this file"""
 
+def parse_texts(raw_text_file):
+    """Parse whatsapp format file into dataframe.
+
+    Given a filepath to a .txt file with Whatsapp formatted lines,
+    this returns a dataframe representing this file
+    """
     id = 0
     text_table = []
     with open(raw_text_file, 'r') as file:
@@ -49,7 +52,7 @@ def parse_texts(raw_text_file):
             if date == "" or sender == "" or length == 0:
                 continue
 
-            tmp_array.extend((id,date,sender,length,message_body))
+            tmp_array.extend((id, date, sender, length, message_body))
             # tmp_array.append(date)
             # tmp_array.append(sender)
             # tmp_array.append(length)
@@ -58,14 +61,17 @@ def parse_texts(raw_text_file):
             # print("Processed line {}".format(id))
     data = np.array(text_table)
     dataframe = pd.DataFrame({'text_id': data[:, 0], 'timestamp': data[:, 1],
-                            'sender': data[:, 2], 'length': data[:, 3],
-                            'raw_text': data[:, 4]})
+                              'sender': data[:, 2], 'length': data[:, 3],
+                              'raw_text': data[:, 4]})
     return dataframe
 
-def _extract_date(line):
-    """Given a string in Whatsapp format,
-    returns a datetime object of when the message was sent."""
 
+def _extract_date(line):
+    """Extract date from whatsapp format string.
+    
+    Given a string in Whatsapp format,
+    returns a datetime object of when the message was sent.
+    """
     pattern = re.compile("(\[[^]]{20}\])")
     match = re.search(pattern, line)
     if match:
@@ -76,10 +82,13 @@ def _extract_date(line):
         date = ""
     return date
 
-def _extract_sender(line):
-    """Given a string in Whatsapp format,
-    returns the sender of the message."""
 
+def _extract_sender(line):
+    """Extract sender from whatsapp format string.
+    
+    Given a string in Whatsapp format,
+    returns the sender of the message.
+    """
     pattern = re.compile("(] [^:]*:)")
     match = re.search(pattern, line)
     if match:
@@ -91,16 +100,20 @@ def _extract_sender(line):
         sender = ""
     return sender
 
+
 def is_dancer(string):
-    """Tests whether string contains :dancer: emoji."""
+    """Compare every char in string with 💃."""
     if '💃' in string:
         return True
     return False
 
-def _extract_length(line):
-    """Given a string in Whatsapp format,
-    returns the length of the message body of the string"""
 
+def _extract_length(line):
+    """Extract sender from whatsapp format string.
+    
+    Given a string in Whatsapp format,
+    returns the length of the message body of the string
+    """
     pattern = re.compile("(] [^:]*: )")
     match = re.search(pattern, line)
     if match:
@@ -110,10 +123,13 @@ def _extract_length(line):
         # TODO: Handle multi-line texts
         return len(line)
 
-def _extract_message(line):
-    """Given a string in Whatsapp format,
-    returns the message body of the string."""
 
+def _extract_message(line):
+    """Extract message from whatsapp format string.
+    
+    Given a string in Whatsapp format,
+    returns the message body of the string.
+    """
     pattern = re.compile("(] [^:]*: )")
     match = re.search(pattern, line)
     if match:
@@ -123,40 +139,46 @@ def _extract_message(line):
         # TODO: Handle multi-line texts
         return line
 
+
 def generate_wordcloud(dataframe, sender=None, mask_path=None, write_path=None):
-    """Generates wordcloud from raw_text field of dataframe. 
+    """Generate wordcloud from raw_text field of dataframe.
+
     dataframe: Required. Dataframe containing chat information.
     sender: Filter text for wordcloud to only messages sent from sender.
     mask_path: Supply filepath to image to be used as mask for wordcloud.
-    write_path: Supply path for wordcloud to be saved to. Default is wordcloud/images/chat{int}.png"""
-
+    write_path: Supply path for wordcloud to be saved to.
+                Default is wordcloud/images/chat{int}.png
+    """
     # Produce text for wordcloud
     if not sender:
         text = " ".join(raw_text for raw_text in dataframe.raw_text)
     else:
-        text = " ".join(raw_text for raw_text in df[df["sender"]==sender].raw_text)
+        text = " ".join(raw_text for raw_text in df[df["sender"] == sender].raw_text)
 
-    print ("There are {} words in the combination of all raw_texts.".format(len(text)))
+    print("There are {} words in the combination of all raw_texts.".format(len(text)))
 
     # Create stopword list:
     stopwords = set(STOPWORDS)
-    stopwords.update(["image", "omitted", "audio", "voice", "call","will","know","now", "ll", "re", "don"])
+    stopwords.update(["image", "omitted", "audio", "voice", "call",
+                      "will", "know", "now", "ll", "re", "don"])
 
     if mask_path:
         # Generate mask
         mask = np.array(Image.open(mask_path))
-        wordcloud = WordCloud(max_words=1000, background_color="white",mode="RGBA", mask=mask,stopwords=stopwords)
+        wordcloud = WordCloud(max_words=1000, background_color="white",
+                              mode="RGBA", mask=mask, stopwords=stopwords)
         # create coloring from image
         image_colors = ImageColorGenerator(mask)
         wordcloud.generate(text)
-         # Display wordcloud
-        plt.figure(figsize=[10,10])
+        # Display wordcloud
+        plt.figure(figsize=[10, 10])
         plt.imshow(wordcloud.recolor(color_func=image_colors), interpolation='bilinear')
     else:
-        wordcloud = WordCloud(max_words=2000, background_color="white",mode="RGBA",stopwords=stopwords)
+        wordcloud = WordCloud(max_words=2000, background_color="white",
+                              mode="RGBA", stopwords=stopwords)
         wordcloud.generate(text)
         # Display wordcloud
-        plt.figure(figsize=[10,10])
+        plt.figure(figsize=[10, 10])
         plt.imshow(wordcloud, interpolation='bilinear')
 
     plt.axis("off")
@@ -174,18 +196,19 @@ def generate_wordcloud(dataframe, sender=None, mask_path=None, write_path=None):
 
     plt.show()
 
-def plot_message_count(dataframe, time_frame = '1D', trendline = False, write_path = None):
-    """ Plot message count for each user for various timeframes.
+
+def plot_message_count(dataframe, time_frame='1D', trendline=False, write_path=None):
+    """Plot message count for each user for various timeframes.
+
     dataframe: Required. Dataframe containing chat information.
     time_frame: Can be used to get weekly message count: '7D', or monthly count '1M'.
                 Default is daily count '1D'.
     trendline: Whether or not to include a trendline. Default is False.
     write_path: Supply path for plot to be saved to. Default is 'wordcloud/images/msgs_day{int}.png'.
     """
-
     # Setup colors and fonts
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    plt.rc('font', family = 'Comic Sans MS')
+    plt.rc('font', family='Comic Sans MS')
     register_matplotlib_converters()
 
     valid = {'1D', '7D', '1M'}
@@ -212,7 +235,7 @@ def plot_message_count(dataframe, time_frame = '1D', trendline = False, write_pa
     # Plot sender lines
     color_index = 0
     for i, sender in enumerate(senders):
-        ax.plot(senders[sender].timestamp, senders[sender].raw_text, linewidth=1.5, color = colors[i])
+        ax.plot(senders[sender].timestamp, senders[sender].raw_text, linewidth=1.5, color=colors[i])
         color_index = i + 1
 
     # calculate the trendline
@@ -256,16 +279,22 @@ def plot_message_count(dataframe, time_frame = '1D', trendline = False, write_pa
         fig.savefig('images/mgs_day/messages_per_day{}.png'.format(i), format = "PNG", dpi = 100)
     plt.show()
     
-def get_general_stats(df, print_stats = False):
-    """ Gets and prints general statistics from the df:
-    - Total messages sent per user
-    - Total words sent per user
-    - Most active day(most messages sent) per user
-    - Most active week(most messages sent) per user
-    - Average messages per day per user
-    - Average messages per week per user
-    - Average message length(chars) per user
-    - Average message length(words) per user
+
+def get_general_stats(df, print_stats=False):
+    """Get and print general statistics from the df.
+
+    - Total messages sent per user:                 'total_msgs'
+    - Total words sent per user:                    'total_words'
+    - Most active day(most messages sent) per user: 'most_active_day'
+    - # of mesages sent on most active day:         'mad_msg_count'
+    - Most active week(most messages sent) per user:'most_active_week'
+    - # of messages sent during most active week:   'maw_msg_count'
+    - Least active week per user:                   'least_active_week'
+    - # of messages sent during least active week:  'law_msg_count'
+    - Average messages per day per user:            'mean_daily_sent'
+    - Average messages per week per user:           'mean_weekly_sent'
+    - Average message length(chars) per user:       'mean_msg_len_char'
+    - Average message length(words) per user:       'mean_msg_len_word'
     Returned in a dict.
 
     Parameters:
@@ -279,12 +308,12 @@ def get_general_stats(df, print_stats = False):
 
     # Total messages sent
     for sender in df.sender.unique():
-        stat_dict[sender]['Total_sent'] = len(df.loc[df.sender == sender])
+        stat_dict[sender]['total_msgs'] = len(df.loc[df.sender == sender])
     
     # Total words sent
     for sender, group in df.groupby('sender'):
         message_lengths = group['raw_text'].map(lambda x: len(re.findall(r'\w+', x)) )
-        stat_dict[sender]['Total_words_sent'] = math.ceil(message_lengths.sum())
+        stat_dict[sender]['total_words'] = math.ceil(message_lengths.sum())
 
     # Most active day
     for sender, group in df.groupby('sender'):
@@ -295,59 +324,100 @@ def get_general_stats(df, print_stats = False):
             max_row = group.loc[group.raw_text.idxmax()]
             # Select date from row
             max_timestamp = max_row.timestamp.date()
-            stat_dict[sender]['Most_active_day'] = max_timestamp
+            stat_dict[sender]['most_active_day'] = max_timestamp
+            stat_dict[sender]['mad_msg_count'] = int(max_row.raw_text)
 
-    # Most active week
+    # Most active week + count for that week
     for sender, group in df.groupby('sender'):
         group = group.set_index('timestamp')
         group = group.resample('7D').count().reset_index()
         max_row = group.loc[group.raw_text.idxmax()]
         max_timestamp = max_row.timestamp.date()
-        stat_dict[sender]['Most_active_week'] = max_timestamp
+        stat_dict[sender]['most_active_week'] = max_timestamp
+        stat_dict[sender]['maw_msg_count'] = int(max_row.raw_text)
+
+    # Least active week + count for that week
+    for sender, group in df.groupby('sender'):
+        group = group.set_index('timestamp')
+        group = group.resample('7D').count().reset_index()
+        min_row = group.loc[group.raw_text.idxmin()]
+        min_timestamp = min_row.timestamp.date()
+        stat_dict[sender]['least_active_week'] = min_timestamp
+        stat_dict[sender]['law_msg_count'] = int(min_row.raw_text)
 
     # Average messages per day
     for sender, group in df.groupby('sender'):
         group = group.set_index('timestamp')
         group = group.resample('1D').count().reset_index()
         average_sent = group.raw_text.mean()
-        stat_dict[sender]['Mean_daily_sent'] = math.ceil(average_sent)
+        stat_dict[sender]['mean_daily_sent'] = math.ceil(average_sent)
     
     # Average messages per week
     for sender, group in df.groupby('sender'):
         group = group.set_index('timestamp')
         group = group.resample('7D').count().reset_index()
         average_sent = group.raw_text.mean()
-        stat_dict[sender]['Mean_weekly_sent'] = math.ceil(average_sent)
+        stat_dict[sender]['mean_weekly_sent'] = math.ceil(average_sent)
 
     # Average message length(chars)
     for sender, group in df.groupby('sender'):
         message_lengths = group['raw_text'].map(lambda x: len(x))
-        stat_dict[sender]['Mean_msg_len_char'] = math.ceil(message_lengths.mean())
+        stat_dict[sender]['mean_msg_len_char'] = math.ceil(message_lengths.mean())
 
     # Average message length(words)
     for sender, group in df.groupby('sender'):
         message_lengths = group['raw_text'].map(lambda x: len(re.findall(r'\w+', x)) )
-        stat_dict[sender]['Mean_msg_len_word'] = math.ceil(message_lengths.mean())
+        stat_dict[sender]['mean_msg_len_word'] = math.ceil(message_lengths.mean())
 
     if print_stats:
         for sender in stat_dict:
-            stat_dict[sender]['Most_active_day'] = stat_dict[sender]['Most_active_day'].strftime('%a %d, %b %Y')
-            start_date = stat_dict[sender]['Most_active_week']
+            stat_dict[sender]['most_active_day'] = stat_dict[sender]['most_active_day'].strftime('%a %d, %b %Y')
+            # Format most_active_week
+            start_date = stat_dict[sender]['most_active_week']
             end_date = start_date + timedelta(days = 7)
             start_date = start_date.strftime('%a %d, %b %Y')
             end_date = end_date.strftime('%a %d, %b %Y')
-            stat_dict[sender]['Most_active_week'] = start_date + " until " + end_date
+            stat_dict[sender]['most_active_week'] = start_date + " until " + end_date
+            # Format least_active_week
+            start_date = stat_dict[sender]['least_active_week']
+            end_date = start_date + timedelta(days = 7)
+            start_date = start_date.strftime('%a %d, %b %Y')
+            end_date = end_date.strftime('%a %d, %b %Y')
+            stat_dict[sender]['least_active_week'] = start_date + " until " + end_date
+
         print(json.dumps(stat_dict, indent = 2))
     
     return stat_dict
 
+
 def plot_msg_len_distrib(df):
+    """Plot the distribution of message lengths for each sender in df."""
     pass
+
 
 def plot_active_hour(df):
+    """Plot the most active hour for each sender in df.
+    
+    The aggregate number of texts sent for each hour is calculated,
+    this is then used to indicate which was the most popular hour to send messages.
+    """
     pass
 
+
+def plot_general_stats(df):
+    """Plot the statistics returned from get_general_stats()."""
+    stats = get_general_stats(df)
+
+
 def analyse_sentiment(df):
+    """Plot the overall sentiment of each sender.
+
+    The sentiment is calculated for each message sent using the NLTK library.
+    This gives a probability of the message being positive, neutral or negative 
+    and the highest probability is taken as the sentiment for that message.
+    The number of positive, neutral and negative messages is then aggregated and used
+    to plot a pie chart. 
+    """
     nltk.download('vader_lexicon')
     sentiment_analyzer = SentimentIntensityAnalyzer()
     neutral, negative, positive = 0, 0, 0
@@ -419,9 +489,10 @@ def analyse_sentiment(df):
     fig.tight_layout()
     plt.show()
 
-# Print iterations progress
+
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
-    """
+    r"""Print a progress bar.
+    
     Call in a loop to create terminal progress bar
     @params:
         iteration   - Required  : current iteration (Int)
@@ -441,6 +512,7 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     if iteration == total: 
         print()
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("filepath", help="Filepath to whatsapp text file to be processed.",
@@ -454,7 +526,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     df = parse_texts(args.filepath)
-    # generate_wordcloud(df,sender = args.sender, mask_path = args.mask, write_path = args.dest)
-    # plot_message_count(df, '1D', trendline = True)
+    generate_wordcloud(df,sender = args.sender, mask_path = args.mask, write_path = args.dest)
+    plot_message_count(df, '1D', trendline = True)
     analyse_sentiment(df)
     get_general_stats(df, print_stats = True)
