@@ -6,6 +6,7 @@ import re
 import math
 import json
 from datetime import *
+import time
 
 import matplotlib.pyplot as plt
 from matplotlib.lines       import Line2D
@@ -358,10 +359,13 @@ def analyse_sentiment(df):
 
     for sender, group in df.groupby('sender'):
         all_text = group.raw_text
+        l = len(all_text)
+        # Initial call to print 0% progress
+        printProgressBar(0, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
         for index, sentence in enumerate(all_text):
-            if index % 10 == 0:
-                print("Processing {0}%".format(int((index * 100) / len(all_text))))
-
+            # Update Progress Bar
+            printProgressBar(index + 1, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
+           
             if re.match(r'^[\w]', sentence) is None:
                 continue
 
@@ -415,6 +419,28 @@ def analyse_sentiment(df):
     fig.tight_layout()
     plt.show()
 
+# Print iterations progress
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = printEnd)
+    # Print New Line on Complete
+    if iteration == total: 
+        print()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("filepath", help="Filepath to whatsapp text file to be processed.",
@@ -428,7 +454,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     df = parse_texts(args.filepath)
-    generate_wordcloud(df,sender = args.sender, mask_path = args.mask, write_path = args.dest)
-    plot_message_count(df, '1D', trendline = True)
-    get_general_stats(df, print_stats = True)
+    # generate_wordcloud(df,sender = args.sender, mask_path = args.mask, write_path = args.dest)
+    # plot_message_count(df, '1D', trendline = True)
     analyse_sentiment(df)
+    get_general_stats(df, print_stats = True)
