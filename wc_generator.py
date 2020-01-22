@@ -29,6 +29,13 @@ Whatsapp line format:
 "[dd/mm/yyyy, hh/mm/ss] SENDER: MESSAGE\n"
 """
 
+def file_len(fname):
+    """Get # lines in a file."""
+    with open(fname) as f:
+        for i, l in enumerate(f):
+            pass
+    return i + 1
+
 
 def parse_texts(raw_text_file):
     """Parse whatsapp format file into dataframe.
@@ -38,9 +45,14 @@ def parse_texts(raw_text_file):
     """
     id = 0
     text_table = []
+    l = file_len(raw_text_file)
+    print("Importing {}".format(raw_text_file))
     with open(raw_text_file, 'r') as file:
+        # Initial call to print 0% progress
+        printProgressBar(0, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
         for line in file:
             id += 1
+            printProgressBar(id, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
             tmp_array = []
 
             date = _extract_date(line)
@@ -63,6 +75,13 @@ def parse_texts(raw_text_file):
     dataframe = pd.DataFrame({'text_id': data[:, 0], 'timestamp': data[:, 1],
                               'sender': data[:, 2], 'length': data[:, 3],
                               'raw_text': data[:, 4]})
+    # Remove users who have only sent one message
+    dataframe = dataframe.groupby('sender').filter(lambda x: x['raw_text'].size > 1.)
+
+    # for sender, group in dataframe.groupby('sender'):
+    #     if len(group['raw_text']) == 1:
+    #         dataframe.drop()
+
     return dataframe
 
 
@@ -155,8 +174,6 @@ def generate_wordcloud(dataframe, sender=None, mask_path=None, write_path=None):
     else:
         text = " ".join(raw_text for raw_text in df[df["sender"] == sender].raw_text)
 
-    print("There are {} words in the combination of all raw_texts.".format(len(text)))
-
     # Create stopword list:
     stopwords = set(STOPWORDS)
     stopwords.update(["image", "omitted", "audio", "voice", "call",
@@ -194,7 +211,7 @@ def generate_wordcloud(dataframe, sender=None, mask_path=None, write_path=None):
         print("Saving to images/chat{}.png.".format(i))
         plt.savefig("images/chat{}.png".format(i), format="png")
 
-    plt.show()
+    plt.draw()
 
 
 def plot_message_count(dataframe, time_frame='1D', trendline=False, write_path=None):
@@ -225,7 +242,7 @@ def plot_message_count(dataframe, time_frame='1D', trendline=False, write_path=N
     dataframe = dataframe.set_index('timestamp')
     senders = {sender: dataframe[dataframe.sender == sender] for sender in dataframe.sender.unique()}
     
-    # Resample to a week by summing
+    # Resample to given timeframe by summing
     for sender in senders:
         senders[sender] = senders[sender].resample(time_frame).count().reset_index()
 
@@ -277,7 +294,7 @@ def plot_message_count(dataframe, time_frame='1D', trendline=False, write_path=N
         while os.path.exists("images/mgs_day/messages_per_day{}.png".format(i)):
             i += 1
         fig.savefig('images/mgs_day/messages_per_day{}.png'.format(i), format = "PNG", dpi = 100)
-    plt.show()
+    plt.draw()
     
 
 def get_general_stats(df, print_stats=False):
@@ -286,11 +303,11 @@ def get_general_stats(df, print_stats=False):
     - Total messages sent per user:                 'total_msgs'
     - Total words sent per user:                    'total_words'
     - Most active day(most messages sent) per user: 'most_active_day'
-    - # of mesages sent on most active day:         'mad_msg_count'
+    - \# of mesages sent on most active day:         'mad_msg_count'
     - Most active week(most messages sent) per user:'most_active_week'
-    - # of messages sent during most active week:   'maw_msg_count'
+    - \# of messages sent during most active week:   'maw_msg_count'
     - Least active week per user:                   'least_active_week'
-    - # of messages sent during least active week:  'law_msg_count'
+    - \# of messages sent during least active week:  'law_msg_count'
     - Average messages per day per user:            'mean_daily_sent'
     - Average messages per week per user:           'mean_weekly_sent'
     - Average message length(chars) per user:       'mean_msg_len_char'
@@ -401,12 +418,86 @@ def plot_active_hour(df):
     The aggregate number of texts sent for each hour is calculated,
     this is then used to indicate which was the most popular hour to send messages.
     """
-    pass
+    # Calculate active_hours
+    active_hours = {}
+    for sender, group in df.groupby('sender'):
+        group['Hour'] = group.apply(lambda row: row.timestamp.hour, axis = 1)
+        text_counts = dict(group.Hour.value_counts())
+        for hour in range(0,24):
+            if hour not in text_counts:
+                text_counts[hour] = 0
+        active_hours[sender] = text_counts
+    for sender in active_hours:
+        xaxis = []
+        xaxis.extend(active_hours[sender].values())
+        active_hours[sender]['xaxis'] = xaxis
+        # xaxis.extend(active_hours[sender].values())
+    yaxis = [i for i in range(1,25)]
+
+    # Plot active_hours
+    fig, ax = plt.subplots()
+    # Color scheme
+    colors = ['#26547c', '#ef476f', '#ffd166', '#06d6a0', '#98c1d9', '#ff99c9', '#3c1518']
+    plt.rc('font', family='Arial')
+    index = 0
+    senders = active_hours.keys()
+    for sender in senders:
+        # color = plt.rcParams['axes.prop_cycle'].by_key()['color'][index+2]
+        ax.scatter(active_hours[sender]['xaxis'], yaxis, c=colors[index], label=sender,
+                    edgecolors='none')
+        index += 1
+    
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.grid(False)
+    ax.set_ylabel('Hour of the day', fontsize = 12)
+    ax.set_xlabel('Overall messages sent', fontsize = 12)
+    ax.legend()
+    plt.yticks(yaxis)
+
+    plt.draw()
 
 
-def plot_general_stats(df):
+def convert(o):
+    """Convert numpy int64 objects to int objects."""
+    if isinstance(o, np.int64): return int(o)  
+    raise TypeError
+
+
+def plot_general_stats(df, write_path=None):
     """Plot the statistics returned from get_general_stats()."""
     stats = get_general_stats(df)
+    fig, axs = plt.subplots(2,3)
+    fig.set_size_inches(18, 10)
+    axs[0,0].bar(list(stats.keys()), [stats[sender]['total_msgs'] for sender in stats])
+    axs[0,0].set_title("Total messages sent")
+    axs[0,1].bar(list(stats.keys()), [stats[sender]['total_words'] for sender in stats])
+    axs[0,1].set_title("Total words sent")
+    axs[0,2].bar(list(stats.keys()), [stats[sender]['mad_msg_count'] for sender in stats])
+    axs[0,2].set_title("Most messages sent in a day")
+    axs[1,0].bar(list(stats.keys()), [stats[sender]['mean_weekly_sent'] for sender in stats])
+    axs[1,0].set_title("Average number of messages/week")
+    axs[1,1].bar(list(stats.keys()), [stats[sender]['mean_msg_len_word'] for sender in stats])
+    axs[1,1].set_title("Average message length")
+    axs[1,2].bar(list(stats.keys()), [stats[sender]['mean_daily_sent'] for sender in stats])
+    axs[1,2].set_title("Average messages sent per day")
+
+    for ax_arr in axs:
+        for ax in ax_arr:
+            plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right', fontsize='x-small')
+
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    fig.suptitle("General statistics")
+
+    # Optionally save plot
+    if write_path:
+        fig.savefig(write_path, format = "PNG", dpi = 100)
+    else:
+        i = 0
+        while os.path.exists("images/general_stats/stats{}.png".format(i)):
+            i += 1
+        fig.savefig('images/general_stats/stats{}.png'.format(i), format = "PNG", dpi = 100)
+    plt.draw()
 
 
 def analyse_sentiment(df):
@@ -487,10 +578,10 @@ def analyse_sentiment(df):
 
     fig.suptitle('Do you text happy?')
     fig.tight_layout()
-    plt.show()
+    plt.draw()
 
 
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+def printProgressBar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
     r"""Print a progress bar.
     
     Call in a loop to create terminal progress bar
@@ -526,7 +617,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     df = parse_texts(args.filepath)
-    generate_wordcloud(df,sender = args.sender, mask_path = args.mask, write_path = args.dest)
-    plot_message_count(df, '1D', trendline = True)
-    analyse_sentiment(df)
-    get_general_stats(df, print_stats = True)
+    # generate_wordcloud(df,sender = args.sender, mask_path = args.mask, write_path = args.dest)
+    # plot_message_count(df, '1D', trendline = False)
+    # analyse_sentiment(df)
+    # plot_general_stats(df)
+    plot_active_hour(df)
+    plt.show()
