@@ -1,165 +1,24 @@
-"""Imports, analyses and charts whatsapp chat data."""
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-import argparse
+"""Functions for creating various plots based on a whatsapp text file dataframe."""
 import json
 import math
 import os
 import re
-from datetime import *
+from datetime import timedelta
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import nltk
 import numpy as np
-import pandas as pd
-import seaborn as sns
-from dateutil.parser import parse
-from emoji.unicode_codes import UNICODE_EMOJI
 from matplotlib.lines import Line2D
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from pandas.plotting import register_matplotlib_converters
 from PIL import Image
 
+import helper_functions as hf
 from wordcloud import STOPWORDS, ImageColorGenerator, WordCloud
 
 
-"""
-Whatsapp line format: 
-"[dd/mm/yyyy, hh/mm/ss] SENDER: MESSAGE\n"
-"""
-
-def file_len(fname):
-    """Get # lines in a file."""
-    with open(fname) as f:
-        for i, l in enumerate(f):
-            pass
-    return i + 1
-
-
-def parse_texts(raw_text_file):
-    """Parse whatsapp format file into dataframe.
-
-    Given a filepath to a .txt file with Whatsapp formatted lines,
-    this returns a dataframe representing this file
-    """
-    id = 0
-    text_table = []
-    l = file_len(raw_text_file)
-    print("Importing {}".format(raw_text_file))
-    with open(raw_text_file, 'r') as file:
-        # Initial call to print 0% progress
-        printProgressBar(0, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
-        for line in file:
-            id += 1
-            printProgressBar(id, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
-            tmp_array = []
-
-            date = _extract_date(line)
-            sender = _extract_sender(line)
-            length = _extract_length(line)
-            message_body = _extract_message(line)
-            
-            # TODO: Handle multi-line texts
-            if date == "" or sender == "" or length == 0:
-                continue
-
-            tmp_array.extend((id, date, sender, length, message_body))
-            # tmp_array.append(date)
-            # tmp_array.append(sender)
-            # tmp_array.append(length)
-            # tmp_array.append(message_body)
-            text_table.append(tmp_array)
-            # print("Processed line {}".format(id))
-    data = np.array(text_table)
-    dataframe = pd.DataFrame({'text_id': data[:, 0], 'timestamp': data[:, 1],
-                              'sender': data[:, 2], 'length': data[:, 3],
-                              'raw_text': data[:, 4]})
-    # Remove users who have only sent one message
-    dataframe = dataframe.groupby('sender').filter(lambda x: x['raw_text'].size > 1.)
-
-    # for sender, group in dataframe.groupby('sender'):
-    #     if len(group['raw_text']) == 1:
-    #         dataframe.drop()
-
-    return dataframe
-
-
-def _extract_date(line):
-    """Extract date from whatsapp format string.
-    
-    Given a string in Whatsapp format,
-    returns a datetime object of when the message was sent.
-    """
-    pattern = re.compile("(\[[^]]{20}\])")
-    match = re.search(pattern, line)
-    if match:
-        raw_date = match.group()[1:-1]
-        date = parse(raw_date, dayfirst=True)
-    else:
-        # TODO: Handle multi-line texts
-        date = ""
-    return date
-
-
-def _extract_sender(line):
-    """Extract sender from whatsapp format string.
-    
-    Given a string in Whatsapp format,
-    returns the sender of the message.
-    """
-    pattern = re.compile("(] [^:]*:)")
-    match = re.search(pattern, line)
-    if match:
-        sender = match.group()[2:-1]
-        if is_dancer(sender):
-            sender = "Clara"
-    else:
-        # TODO: Handle multi-line texts
-        sender = ""
-    return sender
-
-
-def is_dancer(string):
-    """Compare every char in string with 💃."""
-    if '💃' in string:
-        return True
-    return False
-
-
-def _extract_length(line):
-    """Extract sender from whatsapp format string.
-    
-    Given a string in Whatsapp format,
-    returns the length of the message body of the string
-    """
-    pattern = re.compile("(] [^:]*: )")
-    match = re.search(pattern, line)
-    if match:
-        sender_index = match.end()
-        return len(line[sender_index:])
-    else:
-        # TODO: Handle multi-line texts
-        return len(line)
-
-
-def _extract_message(line):
-    """Extract message from whatsapp format string.
-    
-    Given a string in Whatsapp format,
-    returns the message body of the string.
-    """
-    pattern = re.compile("(] [^:]*: )")
-    match = re.search(pattern, line)
-    if match:
-        sender_index = match.end()
-        return line[sender_index:].rstrip()
-    else:
-        # TODO: Handle multi-line texts
-        return line
-
-
-def generate_wordcloud(dataframe, sender=None, mask_path=None, write_path=None):
+def generate_wordcloud(df, sender=None, mask_path=None, write_path=None):
     """Generate wordcloud from raw_text field of dataframe.
 
     dataframe: Required. Dataframe containing chat information.
@@ -170,7 +29,7 @@ def generate_wordcloud(dataframe, sender=None, mask_path=None, write_path=None):
     """
     # Produce text for wordcloud
     if not sender:
-        text = " ".join(raw_text for raw_text in dataframe.raw_text)
+        text = " ".join(raw_text for raw_text in df.raw_text)
     else:
         text = " ".join(raw_text for raw_text in df[df["sender"] == sender].raw_text)
 
@@ -206,13 +65,12 @@ def generate_wordcloud(dataframe, sender=None, mask_path=None, write_path=None):
         print("Saving to {}.".format(write_path))
     else:
         i = 0
-        while os.path.exists("images/chat{}.png".format(i)):
+        while os.path.exists("images/wordclouds/chat{}.png".format(i)):
             i += 1
-        print("Saving to images/chat{}.png.".format(i))
-        plt.savefig("images/chat{}.png".format(i), format="png")
+        print("Saving to images/wordclouds/chat{}.png.".format(i))
+        plt.savefig("images/wordclouds/chat{}.png".format(i), format="png")
 
     plt.draw()
-
 
 def plot_message_count(dataframe, time_frame='1D', trendline=False, write_path=None):
     """Plot message count for each user for various timeframes.
@@ -295,10 +153,9 @@ def plot_message_count(dataframe, time_frame='1D', trendline=False, write_path=N
             i += 1
         fig.savefig('images/mgs_day/messages_per_day{}.png'.format(i), format = "PNG", dpi = 100)
     plt.draw()
-    
 
 def get_general_stats(df, print_stats=False):
-    """Get and print general statistics from the df.
+    r"""Get and print general statistics from the df.
 
     - Total messages sent per user:                 'total_msgs'
     - Total words sent per user:                    'total_words'
@@ -406,11 +263,9 @@ def get_general_stats(df, print_stats=False):
     
     return stat_dict
 
-
 def plot_msg_len_distrib(df):
     """Plot the distribution of message lengths for each sender in df."""
     pass
-
 
 def plot_active_hour(df):
     """Plot the most active hour for each sender in df.
@@ -457,13 +312,6 @@ def plot_active_hour(df):
 
     plt.draw()
 
-
-def convert(o):
-    """Convert numpy int64 objects to int objects."""
-    if isinstance(o, np.int64): return int(o)  
-    raise TypeError
-
-
 def plot_general_stats(df, write_path=None):
     """Plot the statistics returned from get_general_stats()."""
     stats = get_general_stats(df)
@@ -499,7 +347,6 @@ def plot_general_stats(df, write_path=None):
         fig.savefig('images/general_stats/stats{}.png'.format(i), format = "PNG", dpi = 100)
     plt.draw()
 
-
 def analyse_sentiment(df):
     """Plot the overall sentiment of each sender.
 
@@ -522,10 +369,10 @@ def analyse_sentiment(df):
         all_text = group.raw_text
         l = len(all_text)
         # Initial call to print 0% progress
-        printProgressBar(0, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
+        hf.printProgressBar(0, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
         for index, sentence in enumerate(all_text):
             # Update Progress Bar
-            printProgressBar(index + 1, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
+            hf.printProgressBar(index + 1, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
            
             if re.match(r'^[\w]', sentence) is None:
                 continue
@@ -579,47 +426,3 @@ def analyse_sentiment(df):
     fig.suptitle('Do you text happy?')
     fig.tight_layout()
     plt.draw()
-
-
-def printProgressBar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
-    r"""Print a progress bar.
-    
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
-        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
-    """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = printEnd)
-    # Print New Line on Complete
-    if iteration == total: 
-        print()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("filepath", help="Filepath to whatsapp text file to be processed.",
-                        metavar="Whatsapp file")
-    parser.add_argument("-s","--sender", help="Filter text for wordcloud to only messages sent from sender.",
-                        default=None,metavar="[sender]")
-    parser.add_argument("-m","--mask", help="Filepath to image used for a mask for wordcloud.",
-                        default=None,metavar="[mask source]")
-    parser.add_argument("-d","--dest", help="Filepath to where wordcloud should be saved.",
-                        default=None,metavar="[saving destination]")                    
-    args = parser.parse_args()
-
-    df = parse_texts(args.filepath)
-    # generate_wordcloud(df,sender = args.sender, mask_path = args.mask, write_path = args.dest)
-    # plot_message_count(df, '1D', trendline = False)
-    # analyse_sentiment(df)
-    # plot_general_stats(df)
-    plot_active_hour(df)
-    plt.show()
