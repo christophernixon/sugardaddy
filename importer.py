@@ -3,6 +3,7 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import logging
 
 import numpy as np
 import pandas as pd
@@ -24,10 +25,11 @@ class Importer:
 
     def __init__(self, filename):
         """Parse whatsapp format file into dataframe."""
+        self.logger = self.setup_logging()
         if os.path.exists(filename) and os.path.isfile(filename):
             self.df = self._parse_texts(filename)
         else:
-            print("Error: Invalid filepath")
+            self.logger.error("Invalid filepath")
 
     def _file_len(self, fname):
         """Get # lines in a file."""
@@ -42,16 +44,16 @@ class Importer:
         Given a filepath to a .txt file with Whatsapp formatted lines,
         this returns a dataframe representing this file
         """
-        id = 0
+        index = 0
         text_table = []
-        length = self._file_len(raw_text_file)
-        print("Importing {}".format(raw_text_file))
+        file_len = self._file_len(raw_text_file)
+        self.logger.info("Importing {}".format(raw_text_file))
         with open(raw_text_file, 'r') as file:
             # Initial call to print 0% progress
-            hf.printProgressBar(0, length, prefix='Progress:', suffix='Complete', length=50)
+            hf.print_progress_bar(0, file_len, prefix='Progress:', suffix='Complete', length=50)
             for line in file:
-                id += 1
-                hf.printProgressBar(id, length, prefix='Progress:', suffix='Complete', length=50)
+                index += 1
+                hf.print_progress_bar(index, file_len, prefix='Progress:', suffix='Complete', length=50)
                 tmp_array = []
 
                 date = self._extract_date(line)
@@ -63,9 +65,14 @@ class Importer:
                 if date == "" or sender == "" or length == 0:
                     continue
 
-                tmp_array.extend((id, date, sender, length, message_body))
+                tmp_array.extend((index, date, sender, length, message_body))
                 text_table.append(tmp_array)
-                # print("Processed line {}".format(id))
+
+                percent = round(100 * (index / float(file_len)),2)
+                if percent % 5 == 0:
+                    # Log approximately every 5% to get an estimate of which lines are processed.
+                    self.logger.debug("Processed line %s", index)
+
         data = np.array(text_table)
         dataframe = pd.DataFrame({'text_id': data[:, 0], 'timestamp': data[:, 1],
                                   'sender': data[:, 2], 'length': data[:, 3],
@@ -136,3 +143,21 @@ class Importer:
         else:
             # TODO: Handle multi-line texts
             return line
+
+    def setup_logging(self):
+        """Setup logging to file and console."""
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.DEBUG)
+        # Create handlers
+        c_handler = logging.StreamHandler()
+        f_handler = logging.FileHandler("logs/{}.log".format(__name__), mode='w')
+        c_handler.setLevel(logging.WARNING)
+        # Create formatters and add it to handlers
+        c_format = logging.Formatter('%(name)s - %(levelname)s - %(lineno)d - %(message)s')
+        f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
+        c_handler.setFormatter(c_format)
+        f_handler.setFormatter(f_format)
+        # Add handlers to the logger
+        logger.addHandler(c_handler)
+        logger.addHandler(f_handler)
+        return logger

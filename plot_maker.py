@@ -3,6 +3,7 @@ import json
 import math
 import os
 import re
+import logging
 from datetime import timedelta
 
 import matplotlib.dates as mdates
@@ -17,6 +18,21 @@ from PIL import Image
 import helper_functions as hf
 from wordcloud import STOPWORDS, ImageColorGenerator, WordCloud
 
+# Setup logging to file and console.
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# Create handlers
+c_handler = logging.StreamHandler()
+f_handler = logging.FileHandler("logs/{}.log".format(__name__), mode='w')
+c_handler.setLevel(logging.WARNING)
+# Create formatters and add it to handlers
+c_format = logging.Formatter('%(name)s - %(levelname)s - %(lineno)d - %(message)s')
+f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
+c_handler.setFormatter(c_format)
+f_handler.setFormatter(f_format)
+# Add handlers to the logger
+logger.addHandler(c_handler)
+logger.addHandler(f_handler)
 
 def generate_wordcloud(df, sender=None, mask_path=None, write_path=None):
     """Generate wordcloud from raw_text field of dataframe.
@@ -62,12 +78,12 @@ def generate_wordcloud(df, sender=None, mask_path=None, write_path=None):
     # store to file
     if write_path:
         plt.savefig(write_path, format="png")
-        print("Saving to {}.".format(write_path))
+        logger.info("Saving to {}".format(write_path))
     else:
         i = 0
         while os.path.exists("images/wordclouds/chat{}.png".format(i)):
             i += 1
-        print("Saving to images/wordclouds/chat{}.png.".format(i))
+        logger.info("Saving to images/wordclouds/chat{}.png".format(i))
         plt.savefig("images/wordclouds/chat{}.png".format(i), format="png")
 
     plt.draw()
@@ -146,11 +162,13 @@ def plot_message_count(dataframe, time_frame='1D', trendline=False, write_path=N
     ax.grid(True, axis = 'both',linewidth = 0.5)
     
     if write_path:
-        fig.savefig('images/mgs_day/messages_per_day.png', format = "PNG", dpi = 100)
+        logger.info("Saving to {}".format(write_path))
+        fig.savefig(write_path, format = "PNG", dpi = 100)
     else:
         i = 0
         while os.path.exists("images/mgs_day/messages_per_day{}.png".format(i)):
             i += 1
+        logger.info("Saving to images/mgs_day/messages_per_day{}.png".format(i))
         fig.savefig('images/mgs_day/messages_per_day{}.png'.format(i), format = "PNG", dpi = 100)
     plt.draw()
 
@@ -258,9 +276,10 @@ def get_general_stats(df, print_stats=False):
             start_date = start_date.strftime('%a %d, %b %Y')
             end_date = end_date.strftime('%a %d, %b %Y')
             stat_dict[sender]['least_active_week'] = start_date + " until " + end_date
-
+        logger.info("{}".format(json.dumps(stat_dict, indent = 2)))
         print(json.dumps(stat_dict, indent = 2))
-    
+    else:
+        logger.info("{}".format(stat_dict))
     return stat_dict
 
 def plot_msg_len_distrib(df):
@@ -286,7 +305,6 @@ def plot_active_hour(df):
         xaxis = []
         xaxis.extend(active_hours[sender].values())
         active_hours[sender]['xaxis'] = xaxis
-        # xaxis.extend(active_hours[sender].values())
     yaxis = [i for i in range(1,25)]
 
     # Plot active_hours
@@ -339,11 +357,13 @@ def plot_general_stats(df, write_path=None):
 
     # Optionally save plot
     if write_path:
+        logger.info("Saving to {}".format(write_path))
         fig.savefig(write_path, format = "PNG", dpi = 100)
     else:
         i = 0
         while os.path.exists("images/general_stats/stats{}.png".format(i)):
             i += 1
+        logger.info("Saving to images/general_stats/stats{}.png".format(i))
         fig.savefig('images/general_stats/stats{}.png'.format(i), format = "PNG", dpi = 100)
     plt.draw()
 
@@ -369,10 +389,10 @@ def analyse_sentiment(df):
         all_text = group.raw_text
         l = len(all_text)
         # Initial call to print 0% progress
-        hf.printProgressBar(0, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
+        hf.print_progress_bar(0, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
         for index, sentence in enumerate(all_text):
             # Update Progress Bar
-            hf.printProgressBar(index + 1, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
+            hf.print_progress_bar(index + 1, l, prefix = 'Progress:', suffix = 'Complete', length = 50)
            
             if re.match(r'^[\w]', sentence) is None:
                 continue
@@ -390,7 +410,8 @@ def analyse_sentiment(df):
                 positive += 1
 
         total = neutral + negative + positive
-        print("Negative: {0}% | Neutral: {1}% | Positive: {2}%".format(
+
+        logger.info("Negative: {0}% | Neutral: {1}% | Positive: {2}%".format(
             int(negative*100/total), int(neutral*100/total), int(positive*100/total)))
 
         labels = ['Neutral', 'Negative', 'Positive']
