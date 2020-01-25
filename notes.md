@@ -1,15 +1,15 @@
 ## TODO (loosely ordered by importance)
 - [x] __Stats:__
     Print simple statistics such as total number of messages per user, most active day, average messages per day, average message length(words and characters), number of times affection is expressed, favourite word, least active week, msg counts for most and least active weeks, average response times.
-- [ ] __Graph: General Statistics:__
+- [x] __Graph: General Statistics:__
     A series of bar charts, a bar for each member of chat, a chart for each statistic.
 - [ ] __Graph: Most active weekday:__
     Bubble-plot with a bubble for each weekday, size corresponds to number of messages sent on that day.
 - [ ] __Graph: Most popular time to text:__
     Bubble-plot with a bubble for each hour of the day (24 hrs) and size is popularity. Otherwise could be done with bar chart.
-- [ ] __Add logging:__
+- [x] __Add logging:__
     Switch to logging for keeping track of lines processed and important imformation.
-- [ ] __Refactor architecture:__
+- [x] __Refactor architecture:__
     I think it would be sensible to split the current architecture into two modules:
     1) A data-collection module which reads in the raw chat data, processes it into a dataframe and calculates the general statastics on the chat.
     2) A visualisation module which builds and displays visualisations of the dataframe and general statistics for the given chat.

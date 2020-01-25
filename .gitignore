@@ -6,3 +6,4 @@ chats
 __pycache__
 misc
 wordcloud
+logs
