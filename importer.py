@@ -25,7 +25,7 @@ class Importer:
 
     def __init__(self, filename):
         """Parse whatsapp format file into dataframe."""
-        self.logger = self.setup_logging()
+        self.logger = setup_logging()
         if os.path.exists(filename) and os.path.isfile(filename):
             self.df = self._parse_texts(filename)
         else:
@@ -144,20 +144,21 @@ class Importer:
             # TODO: Handle multi-line texts
             return line
 
-    def setup_logging(self):
-        """Setup logging to file and console."""
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.DEBUG)
-        # Create handlers
-        c_handler = logging.StreamHandler()
-        f_handler = logging.FileHandler("logs/{}.log".format(__name__), mode='w')
-        c_handler.setLevel(logging.WARNING)
-        # Create formatters and add it to handlers
-        c_format = logging.Formatter('%(name)s - %(levelname)s - %(lineno)d - %(message)s')
-        f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
-        c_handler.setFormatter(c_format)
-        f_handler.setFormatter(f_format)
-        # Add handlers to the logger
-        logger.addHandler(c_handler)
-        logger.addHandler(f_handler)
-        return logger
+
+def setup_logging():
+    """Setup logging to file and console."""
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    # Create handlers
+    c_handler = logging.StreamHandler()
+    f_handler = logging.FileHandler("logs/{}.log".format(__name__), mode='w')
+    c_handler.setLevel(logging.WARNING)
+    # Create formatters and add it to handlers
+    c_format = logging.Formatter('%(name)s - %(levelname)s - %(lineno)d - %(message)s')
+    f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
+    c_handler.setFormatter(c_format)
+    f_handler.setFormatter(f_format)
+    # Add handlers to the logger
+    logger.addHandler(c_handler)
+    logger.addHandler(f_handler)
+    return logger

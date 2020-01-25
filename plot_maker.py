@@ -88,10 +88,10 @@ def generate_wordcloud(df, sender=None, mask_path=None, write_path=None):
 
     plt.draw()
 
-def plot_message_count(dataframe, time_frame='1D', trendline=False, write_path=None):
+def plot_message_count(df, time_frame='1D', trendline=False, write_path=None):
     """Plot message count for each user for various timeframes.
 
-    dataframe: Required. Dataframe containing chat information.
+    df: Required. Dataframe containing chat information.
     time_frame: Can be used to get weekly message count: '7D', or monthly count '1M'.
                 Default is daily count '1D'.
     trendline: Whether or not to include a trendline. Default is False.
@@ -113,8 +113,8 @@ def plot_message_count(dataframe, time_frame='1D', trendline=False, write_path=N
         time_frame_full = 'month'
 
     # Set index to be timestamp for resampling
-    dataframe = dataframe.set_index('timestamp')
-    senders = {sender: dataframe[dataframe.sender == sender] for sender in dataframe.sender.unique()}
+    df = df.set_index('timestamp')
+    senders = {sender: df[df.sender == sender] for sender in df.sender.unique()}
     
     # Resample to given timeframe by summing
     for sender in senders:
@@ -133,7 +133,7 @@ def plot_message_count(dataframe, time_frame='1D', trendline=False, write_path=N
     if trendline:
         x = [x for x in senders[sender].timestamp.index]
         y = senders[sender].raw_text.values
-        z = np.polyfit(x, y, 10)
+        z = np.polyfit(x, y, 14)
         p = np.poly1d(z)
         ax.plot(senders[sender].timestamp, p(x), linewidth = 2, color = colors[color_index])
 
@@ -286,7 +286,7 @@ def plot_msg_len_distrib(df):
     """Plot the distribution of message lengths for each sender in df."""
     pass
 
-def plot_active_hour(df):
+def plot_active_hour(df, write_path=None):
     """Plot the most active hour for each sender in df.
     
     The aggregate number of texts sent for each hour is calculated,
@@ -328,6 +328,17 @@ def plot_active_hour(df):
     ax.legend()
     plt.yticks(yaxis)
 
+    # store to file
+    if write_path:
+        plt.savefig(write_path, format="png")
+        logger.info("Saving to {}".format(write_path))
+    else:
+        i = 0
+        while os.path.exists("images/active_hours/active_hours{}.png".format(i)):
+            i += 1
+        logger.info("Saving to images/active_hours/active_hours{}.png".format(i))
+        plt.savefig("images/active_hours/active_hours{}.png".format(i), format="png")
+
     plt.draw()
 
 def plot_general_stats(df, write_path=None):
@@ -367,7 +378,7 @@ def plot_general_stats(df, write_path=None):
         fig.savefig('images/general_stats/stats{}.png'.format(i), format = "PNG", dpi = 100)
     plt.draw()
 
-def analyse_sentiment(df):
+def analyse_sentiment(df, write_path=None):
     """Plot the overall sentiment of each sender.
 
     The sentiment is calculated for each message sent using the NLTK library.
@@ -446,4 +457,16 @@ def analyse_sentiment(df):
 
     fig.suptitle('Do you text happy?')
     fig.tight_layout()
+
+    # Optionally save plot
+    if write_path:
+        logger.info("Saving to {}".format(write_path))
+        fig.savefig(write_path, format = "PNG", dpi = 100)
+    else:
+        i = 0
+        while os.path.exists("images/sentiments/sentiment{}.png".format(i)):
+            i += 1
+        logger.info("Saving to images/sentiments/sentiment{}.png".format(i))
+        fig.savefig('images/sentiments/sentiment{}.png'.format(i), format = "PNG", dpi = 100)
+
     plt.draw()
